@@ -1,0 +1,213 @@
+:root {
+  color-scheme: light;
+  font-family: "Inter", system-ui, sans-serif;
+  background: linear-gradient(180deg, #e8f6f3 0%, #f9fcff 40%, #ffffff 100%);
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body,
+html,
+#root {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-image:
+    radial-gradient(
+      circle at top left,
+      rgba(151, 211, 201, 0.4),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(169, 201, 233, 0.35),
+      transparent 28%
+    );
+}
+
+.app-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 2.75rem 1.5rem 3rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 2.25rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: clamp(2.4rem, 4vw, 3.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: #174f4b;
+  text-transform: uppercase;
+}
+
+header p {
+  margin: 1rem auto 0;
+  max-width: 720px;
+  color: #3a556b;
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+header .subtext {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.96rem;
+  color: #0f172a;
+}
+
+header .subtext span {
+  display: inline-flex;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.75rem;
+  background: #d2f0e2;
+  color: #12524d;
+  font-weight: 700;
+}
+
+.message {
+  text-align: center;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem auto;
+  color: #153d3a;
+  background: rgba(234, 249, 246, 0.95);
+  border: 1px solid rgba(32, 138, 130, 0.2);
+  border-radius: 1rem;
+  max-width: 760px;
+  box-shadow: 0 14px 35px rgba(42, 108, 124, 0.08);
+}
+
+.explain {
+  margin: 0 auto 1rem;
+  max-width: 760px;
+  background: linear-gradient(
+    90deg,
+    rgba(210, 240, 226, 0.6),
+    rgba(224, 245, 242, 0.6)
+  );
+  border-left: 4px solid #12524d;
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  color: #0f3b38;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.message.error {
+  color: #7c2b2b;
+  border-color: rgba(248, 113, 113, 0.25);
+  background: #fff2f2;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid rgba(33, 105, 117, 0.13);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 32px 60px rgba(24, 88, 105, 0.08);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  min-width: 680px;
+}
+
+th,
+td {
+  padding: 1rem 1.25rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(52, 102, 115, 0.12);
+}
+
+th {
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #174f4b;
+  background: rgba(224, 245, 242, 0.95);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+tbody tr {
+  transition:
+    background-color 180ms ease,
+    transform 180ms ease;
+}
+
+tbody tr:hover {
+  transform: translateX(2px);
+  background-color: rgba(212, 238, 236, 0.5);
+}
+
+tbody tr:nth-child(odd) {
+  background: rgba(224, 245, 242, 0.55);
+}
+
+tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+td:first-child {
+  font-weight: 700;
+  color: #134140;
+}
+
+td:nth-child(3) {
+  font-family: "Courier New", Courier, monospace;
+  color: #255b60;
+}
+
+.caption {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  color: #3a556b;
+}
+
+@media (max-width: 840px) {
+  .app-shell {
+    padding: 1.75rem 1rem 2rem;
+  }
+
+  th,
+  td {
+    padding: 0.85rem 0.9rem;
+  }
+}
+
+@media (max-width: 680px) {
+  header h1 {
+    font-size: 2.2rem;
+  }
+
+  .table-wrapper {
+    padding: 0.75rem;
+  }
+
+  table {
+    min-width: 100%;
+  }
+
+  th,
+  td {
+    font-size: 0.95rem;
+  }
+}
