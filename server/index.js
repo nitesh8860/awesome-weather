@@ -2,7 +2,9 @@ import express from "express";
 import cors from "cors";
 import fs from "fs/promises";
 import path from "path";
+import { fileURLToPath } from "url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -13,9 +15,10 @@ const cities = [];
 const CITY_SOURCE_URL =
   "https://countriesnow.space/api/v0.1/countries/population/cities";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
-const MAX_CITY_LOAD = 600;
+const MAX_CITY_LOAD = 1200;
+const FORECAST_RANGE_DAYS = 60;
 
-const CACHE_FILE = path.resolve(process.cwd(), "server", "weather-cache.json");
+const CACHE_FILE = path.join(__dirname, "server", "weather-cache.json");
 const CACHE_TTL_DAYS = 3; // re-evaluate every 3 days by default
 let cache = { timestamp: 0, data: [] };
 
@@ -189,7 +192,7 @@ if (isCacheStale()) {
 async function getCityWeather(city) {
   const today = new Date();
   const endDate = new Date(today);
-  endDate.setDate(today.getDate() + 6);
+  endDate.setDate(today.getDate() + FORECAST_RANGE_DAYS);
 
   const params = new URLSearchParams({
     latitude: city.latitude,
@@ -256,6 +259,26 @@ async function getCityWeather(city) {
     sampleHour: rainyFiltered[0]?.time || null,
   };
 }
+
+app.get("/api/weather", async (req, res) => {
+  try {
+    if (!cache || !Array.isArray(cache.data) || cache.data.length === 0) {
+      return res.status(503).json({
+        message:
+          "Weather cache is warming. Please try again in a few minutes while data is fetched.",
+      });
+    }
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      count: cache.data.length,
+      data: cache.data,
+    });
+  } catch (error) {
+    console.error("API error:", error);
+    res.status(500).json({ error: "Unable to fetch weather data right now." });
+  }
+});
 
 app.get("/api/top-rainy", async (req, res) => {
   try {
