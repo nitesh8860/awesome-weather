@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
 const DEFAULT_MIN_RAINY_HOURS = 1;
-const DEFAULT_MIN_MONTHLY_RAINY_DAYS = 6;
-const DEFAULT_MIN_AVG_TEMP = 16;
-const DEFAULT_MIN_AVG_HUMIDITY = 55;
+const DEFAULT_MIN_TOTAL_PRECIPITATION = 1;
+const DEFAULT_PREFERRED_TEMP = 18;
+const DEFAULT_PREFERRED_HUMIDITY = 55;
 const RANGE_DELTA = 5;
 
 function inRange(value, center) {
@@ -15,17 +15,18 @@ function inRange(value, center) {
 function App() {
   const [places, setPlaces] = useState([]);
   const [minRainyHours, setMinRainyHours] = useState(DEFAULT_MIN_RAINY_HOURS);
-  const [minMonthlyRainyDays, setMinMonthlyRainyDays] = useState(
-    DEFAULT_MIN_MONTHLY_RAINY_DAYS,
+  const [minTotalPrecipitation, setMinTotalPrecipitation] = useState(
+    DEFAULT_MIN_TOTAL_PRECIPITATION,
   );
-  const [minAvgTemp, setMinAvgTemp] = useState(DEFAULT_MIN_AVG_TEMP);
-  const [minAvgHumidity, setMinAvgHumidity] = useState(
-    DEFAULT_MIN_AVG_HUMIDITY,
+  const [preferredTemp, setPreferredTemp] = useState(DEFAULT_PREFERRED_TEMP);
+  const [preferredHumidity, setPreferredHumidity] = useState(
+    DEFAULT_PREFERRED_HUMIDITY,
   );
   const [enableRainyHours, setEnableRainyHours] = useState(true);
-  const [enableMonthlyRainyDays, setEnableMonthlyRainyDays] = useState(true);
-  const [enableAvgTemp, setEnableAvgTemp] = useState(true);
-  const [enableAvgHumidity, setEnableAvgHumidity] = useState(true);
+  const [enableTotalPrecipitation, setEnableTotalPrecipitation] =
+    useState(true);
+  const [enableTemp, setEnableTemp] = useState(true);
+  const [enableHumidity, setEnableHumidity] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -53,7 +54,7 @@ function App() {
   return (
     <div className="app-shell">
       <header>
-        <h2>Places with calm rainy weather for the next 60 days</h2>
+        <h2>Exact weather on day 14 from today</h2>
       </header>
 
       {loading && <div className="message">Loading weather data…</div>}
@@ -63,18 +64,17 @@ function App() {
         <div className="content-grid">
           <div className="side-panel">
             <div className="explain">
-              <strong>Why we call this "awesome" weather</strong>
+              <strong>14th-day forecast only</strong>
               <div>
-                We scan the next 60 days for rainy windows with mild 15–22°C
-                temperatures and comfortable humidity. That blend feels calm,
-                moody, and refreshingly quiet. Results are from the full cached
-                2-month forecast set.
+                This view shows the exact forecast 14 days from today. No
+                multi-day blending means the filters apply to the single-day
+                forecast values.
               </div>
             </div>
             <div className="slider-panel">
               <div className="slider-note">
-                Ideal defaults: 15–17°C, 45–55% humidity, 6–8 rainy days/month,
-                1–3 rainy hours/day on rainy days.
+                Use filters to narrow down the day-14 results. Values are
+                computed from the exact forecast for that day.
               </div>
               <div className="filter-toggle-row">
                 <label>
@@ -90,35 +90,35 @@ function App() {
                 <label>
                   <input
                     type="checkbox"
-                    checked={enableMonthlyRainyDays}
+                    checked={enableTotalPrecipitation}
                     onChange={(event) =>
-                      setEnableMonthlyRainyDays(event.target.checked)
+                      setEnableTotalPrecipitation(event.target.checked)
                     }
                   />
-                  Rainy Days/month
+                  Total Precipitation
                 </label>
                 <label>
                   <input
                     type="checkbox"
-                    checked={enableAvgTemp}
-                    onChange={(event) => setEnableAvgTemp(event.target.checked)}
+                    checked={enableTemp}
+                    onChange={(event) => setEnableTemp(event.target.checked)}
                   />
-                  Avg Temp
+                  Temperature
                 </label>
                 <label>
                   <input
                     type="checkbox"
-                    checked={enableAvgHumidity}
+                    checked={enableHumidity}
                     onChange={(event) =>
-                      setEnableAvgHumidity(event.target.checked)
+                      setEnableHumidity(event.target.checked)
                     }
                   />
-                  Avg Hum
+                  Humidity
                 </label>
               </div>
               <div className="slider-row">
                 <label htmlFor="rainy-hours-slider">
-                  Rainy Hours/day around: <strong>{minRainyHours}</strong>
+                  Rainy Hours around: <strong>{minRainyHours}</strong>
                 </label>
                 <input
                   id="rainy-hours-slider"
@@ -138,40 +138,19 @@ function App() {
                 </div>
               </div>
               <div className="slider-row">
-                <label htmlFor="rainy-days-slider">
-                  Rainy Days/month around:{" "}
-                  <strong>{minMonthlyRainyDays}</strong>
+                <label htmlFor="precipitation-slider">
+                  Precipitation around:{" "}
+                  <strong>{minTotalPrecipitation} mm</strong>
                 </label>
                 <input
-                  id="rainy-days-slider"
-                  type="range"
-                  min="0"
-                  max="30"
-                  step="1"
-                  value={minMonthlyRainyDays}
-                  onChange={(event) =>
-                    setMinMonthlyRainyDays(Number(event.target.value))
-                  }
-                />
-                <div className="slider-ticks">
-                  <span>0</span>
-                  <span>15</span>
-                  <span>30</span>
-                </div>
-              </div>
-              <div className="slider-row">
-                <label htmlFor="avg-temp-slider">
-                  Avg Temp around: <strong>{minAvgTemp}°C</strong>
-                </label>
-                <input
-                  id="avg-temp-slider"
+                  id="precipitation-slider"
                   type="range"
                   min="0"
                   max="50"
                   step="1"
-                  value={minAvgTemp}
+                  value={minTotalPrecipitation}
                   onChange={(event) =>
-                    setMinAvgTemp(Number(event.target.value))
+                    setMinTotalPrecipitation(Number(event.target.value))
                   }
                 />
                 <div className="slider-ticks">
@@ -181,32 +160,49 @@ function App() {
                 </div>
               </div>
               <div className="slider-row">
+                <label htmlFor="temp-slider">
+                  Target temp around: <strong>{preferredTemp}°C</strong>
+                </label>
+                <input
+                  id="temp-slider"
+                  type="range"
+                  min="0"
+                  max="40"
+                  step="1"
+                  value={preferredTemp}
+                  onChange={(event) =>
+                    setPreferredTemp(Number(event.target.value))
+                  }
+                />
+                <div className="slider-ticks">
+                  <span>0</span>
+                  <span>20</span>
+                  <span>40</span>
+                </div>
+              </div>
+              <div className="slider-row">
                 <label htmlFor="humidity-slider">
-                  Avg Hum around: <strong>{minAvgHumidity}%</strong>
+                  Target humidity around: <strong>{preferredHumidity}%</strong>
                 </label>
                 <input
                   id="humidity-slider"
                   type="range"
-                  min="10"
+                  min="0"
                   max="100"
                   step="1"
-                  value={minAvgHumidity}
+                  value={preferredHumidity}
                   onChange={(event) =>
-                    setMinAvgHumidity(Number(event.target.value))
+                    setPreferredHumidity(Number(event.target.value))
                   }
                 />
                 <div className="slider-ticks">
-                  <span>10%</span>
-                  <span>55%</span>
+                  <span>0%</span>
+                  <span>50%</span>
                   <span>100%</span>
                 </div>
               </div>
-              <div className="slider-note">
-                Refresh restores the default sliders.
-              </div>
               <div className="slider-note secondary">
-                Rainy Days/month is a monthly estimate; Rainy Hours/day is
-                average hours on rainy days.
+                Use the toggles to keep or ignore each filter.
               </div>
             </div>
           </div>
@@ -218,38 +214,45 @@ function App() {
                     <th>#</th>
                     <th>City</th>
                     <th>Location</th>
-                    <th>Rainy Hours/day</th>
-                    <th>Rainy Days/month</th>
-                    <th>Avg Temp (°C)</th>
-                    <th>Avg Hum (%)</th>
+                    <th>Forecast Date</th>
+                    <th>Rainy Hours</th>
+                    <th>Total Precipitation</th>
+                    <th>Min Temp (°C)</th>
+                    <th>Max Temp (°C)</th>
+                    <th>Min Hum (%)</th>
+                    <th>Max Hum (%)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {places.filter((place) => {
+                    const dayTemp =
+                      place.minTemperature != null &&
+                      place.maxTemperature != null
+                        ? (place.minTemperature + place.maxTemperature) / 2
+                        : (place.minTemperature ?? place.maxTemperature ?? 0);
+                    const dayHumidity =
+                      place.minHumidity != null && place.maxHumidity != null
+                        ? (place.minHumidity + place.maxHumidity) / 2
+                        : (place.minHumidity ?? place.maxHumidity ?? 0);
+
                     if (
                       enableRainyHours &&
-                      !inRange(
-                        place.avgRainHoursPerRainyDay ?? 0,
-                        minRainyHours,
-                      )
+                      !inRange(place.rainyHours, minRainyHours)
                     ) {
                       return false;
                     }
                     if (
-                      enableMonthlyRainyDays &&
-                      !inRange(place.monthlyRainyDays ?? 0, minMonthlyRainyDays)
+                      enableTotalPrecipitation &&
+                      !inRange(place.totalPrecipitation, minTotalPrecipitation)
                     ) {
                       return false;
                     }
-                    if (
-                      enableAvgTemp &&
-                      !inRange(place.averageTemperature, minAvgTemp)
-                    ) {
+                    if (enableTemp && !inRange(dayTemp, preferredTemp)) {
                       return false;
                     }
                     if (
-                      enableAvgHumidity &&
-                      !inRange(place.averageHumidity ?? 0, minAvgHumidity)
+                      enableHumidity &&
+                      !inRange(dayHumidity, preferredHumidity)
                     ) {
                       return false;
                     }
@@ -257,33 +260,39 @@ function App() {
                   }).length ? (
                     places
                       .filter((place) => {
+                        const dayTemp =
+                          place.minTemperature != null &&
+                          place.maxTemperature != null
+                            ? (place.minTemperature + place.maxTemperature) / 2
+                            : (place.minTemperature ??
+                              place.maxTemperature ??
+                              0);
+                        const dayHumidity =
+                          place.minHumidity != null && place.maxHumidity != null
+                            ? (place.minHumidity + place.maxHumidity) / 2
+                            : (place.minHumidity ?? place.maxHumidity ?? 0);
+
                         if (
                           enableRainyHours &&
+                          !inRange(place.rainyHours, minRainyHours)
+                        ) {
+                          return false;
+                        }
+                        if (
+                          enableTotalPrecipitation &&
                           !inRange(
-                            place.avgRainHoursPerRainyDay ?? 0,
-                            minRainyHours,
+                            place.totalPrecipitation,
+                            minTotalPrecipitation,
                           )
                         ) {
                           return false;
                         }
-                        if (
-                          enableMonthlyRainyDays &&
-                          !inRange(
-                            place.monthlyRainyDays ?? 0,
-                            minMonthlyRainyDays,
-                          )
-                        ) {
+                        if (enableTemp && !inRange(dayTemp, preferredTemp)) {
                           return false;
                         }
                         if (
-                          enableAvgTemp &&
-                          !inRange(place.averageTemperature, minAvgTemp)
-                        ) {
-                          return false;
-                        }
-                        if (
-                          enableAvgHumidity &&
-                          !inRange(place.averageHumidity ?? 0, minAvgHumidity)
+                          enableHumidity &&
+                          !inRange(dayHumidity, preferredHumidity)
                         ) {
                           return false;
                         }
@@ -303,16 +312,19 @@ function App() {
                               {place.location}
                             </a>
                           </td>
-                          <td>{place.avgRainHoursPerRainyDay}</td>
-                          <td>{place.monthlyRainyDays}</td>
-                          <td>{place.averageTemperature}</td>
-                          <td>{place.averageHumidity ?? "-"}</td>
+                          <td>{place.forecastDate}</td>
+                          <td>{place.rainyHours}</td>
+                          <td>{place.totalPrecipitation}</td>
+                          <td>{place.minTemperature ?? "-"}</td>
+                          <td>{place.maxTemperature ?? "-"}</td>
+                          <td>{place.minHumidity ?? "-"}</td>
+                          <td>{place.maxHumidity ?? "-"}</td>
                         </tr>
                       ))
                   ) : (
                     <tr>
-                      <td colSpan="7">
-                        No matching places found for the next 60 days.
+                      <td colSpan="10">
+                        No forecast data available for day 14.
                       </td>
                     </tr>
                   )}
