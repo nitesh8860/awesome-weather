@@ -292,6 +292,17 @@ function App() {
                   ))}
                 </div>
 
+                {mood && (() => {
+                  const active = PRESETS.find((p) => p.label === mood);
+                  if (!active) return null;
+                  return (
+                    <div className="mood-summary" style={{ "--mood-color": active.color }}>
+                      <span className="mood-summary-icon">{active.icon}</span>
+                      <span className="mood-summary-text">{active.desc}</span>
+                    </div>
+                  );
+                })()}
+
                 <div className="filter-toggle-row">
                   <label><input type="checkbox" checked={enableRainyHours} onChange={handleToggleChange(setEnableRainyHours)} /> Rain</label>
                   <label><input type="checkbox" checked={enableTemp} onChange={handleToggleChange(setEnableTemp)} /> Temperature</label>

@@ -144,6 +144,30 @@ header h1 .hl {
   color: #888;
 }
 
+.mood-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  margin: -0.2rem 0 0.2rem;
+  background: var(--mood-color, var(--accent));
+  background: color-mix(in srgb, var(--mood-color, var(--accent)) 12%, transparent);
+  border-radius: 0.6rem;
+  border-left: 3px solid var(--mood-color, var(--accent));
+  font-size: 0.85rem;
+  color: #333;
+  line-height: 1.4;
+}
+
+.mood-summary-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.mood-summary-text {
+  font-weight: 500;
+}
+
 /* ─── Layout ─── */
 
 .content-grid {
