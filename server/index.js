@@ -193,7 +193,7 @@ async function refreshOffset(offset) {
     `Refreshing weather cache for offset ${offset}d (${cities.length} cities)...`,
   );
   const results = [];
-  const batchSize = 8;
+  const batchSize = 3;
   for (let i = 0; i < cities.length; i += batchSize) {
     const batch = cities.slice(i, i + batchSize);
 
@@ -208,28 +208,20 @@ async function refreshOffset(offset) {
       if (s.status === "fulfilled" && s.value) {
         results.push(s.value);
       } else if (s.status === "rejected") {
-        retryItems.push(batch[idx]);
+        retryItems.push({ city: batch[idx], reason: s.reason });
         if (s.reason) {
           console.log(`  [FAIL] ${batch[idx].name}: ${s.reason.message?.slice(0, 150) || s.reason}`);
         }
       }
     });
 
-    // Retry failed items once
-    if (retryItems.length > 0) {
-      // Check if any failed with 429 (rate limit) — if so, wait longer
-      const hasRateLimit = settled.some(
-        (s) => s.status === "rejected" && s.reason?.status === 429,
-      );
-      const retryDelay = hasRateLimit ? 30000 : 2000;
-      if (hasRateLimit) {
-        console.log(
-          `  Rate limited (429). Waiting ${retryDelay / 1000}s before retry...`,
-        );
-      }
-      await new Promise((r) => setTimeout(r, retryDelay));
+    // Retry non-rate-limited failures once
+    const toRetry = retryItems.filter((r) => r.reason?.status !== 429).map((r) => r.city);
+
+    if (toRetry.length > 0) {
+      await new Promise((r) => setTimeout(r, 2000));
       const retried = await Promise.allSettled(
-        retryItems.map((city) => getCityWeather(city, offset)),
+        toRetry.map((city) => getCityWeather(city, offset)),
       );
       retried.forEach((s) => {
         if (s.status === "fulfilled" && s.value) results.push(s.value);
@@ -237,7 +229,7 @@ async function refreshOffset(offset) {
     }
 
     // polite delay to avoid hammering APIs
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 2500));
   }
 
   // Atomically swap the staging data into active cache
@@ -257,7 +249,7 @@ async function refreshAllOffsets() {
       console.error(`Failed to refresh offset ${offset}d:`, e);
     }
     // Stagger offsets to avoid hammering the API
-    await new Promise((r) => setTimeout(r, 10000));
+    await new Promise((r) => setTimeout(r, 15000));
   }
 }
 
