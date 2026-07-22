@@ -16,7 +16,7 @@ const cities = [];
 const CITY_SOURCE_URL =
   "https://countriesnow.space/api/v0.1/countries/population/cities";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
-const MAX_CITY_LOAD = 5000;
+const MAX_CITY_LOAD = 4000;
 const SUPPORTED_OFFSETS = [6, 13]; // 1 week and 2 weeks ahead (Open-Meteo limit: 16 days)
 const RANGE_DELTA = 5;
 
