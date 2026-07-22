@@ -266,23 +266,22 @@ header h1 .hl {
   transition: color 350ms ease;
 }
 
-.reset-btn {
-  display: block;
-  margin: 0.4rem auto 0;
-  padding: 0.3rem 1rem;
-  border: 1px solid var(--accent-alpha);
-  border-radius: 2rem;
-  background: transparent;
-  color: var(--accent-text);
-  font-size: 0.78rem;
+.action-btn {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgba(120, 120, 120, 0.2);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: #555;
+  font-size: 0.8rem;
   font-family: inherit;
   cursor: pointer;
   transition: all 150ms ease;
 }
 
-.reset-btn:hover {
-  background: var(--accent-alpha);
+.action-btn:hover {
+  background: var(--accent-light);
   border-color: var(--accent-border);
+  color: var(--accent-text);
 }
 
 /* ─── Cards ─── */
@@ -324,6 +323,12 @@ header h1 .hl {
   overflow: hidden;
   border: 1px solid var(--accent-alpha);
   transition: border-color 350ms ease;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
 }
 
 .search-row {

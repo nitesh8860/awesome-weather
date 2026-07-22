@@ -208,10 +208,10 @@ function App() {
   const [preferredTemp, setPreferredTemp] = useState(initialVal("temp", DEFAULT_PREFERRED_TEMP));
   const [preferredHumidity, setPreferredHumidity] = useState(initialVal("humidity", DEFAULT_PREFERRED_HUMIDITY));
   const [preferredWind, setPreferredWind] = useState(initialVal("wind", DEFAULT_PREFERRED_WIND));
-  const [enableRainyHours, setEnableRainyHours] = useState(initialBool("enableRainy", true));
-  const [enableTemp, setEnableTemp] = useState(initialBool("enableTemp", true));
-  const [enableHumidity, setEnableHumidity] = useState(initialBool("enableHumidity", true));
-  const [enableWind, setEnableWind] = useState(initialBool("enableWind", true));
+  const [enableRainyHours, setEnableRainyHours] = useState(initialBool("enableRainy", false));
+  const [enableTemp, setEnableTemp] = useState(initialBool("enableTemp", false));
+  const [enableHumidity, setEnableHumidity] = useState(initialBool("enableHumidity", false));
+  const [enableWind, setEnableWind] = useState(initialBool("enableWind", false));
   const [mood, setMood] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("cards");
@@ -400,44 +400,41 @@ function App() {
                   <div className="slider-ticks"><span>0</span><span>25</span><span>50</span></div>
                 </div>
 
-                <div className="slider-note secondary">
-                  <span className="match-count">
-                    {matchedCount} of {allPlacesCount} cities match
-                    {loading && places.length > 0 && " (updating…)"}
-                  </span>
-                  <button
-                    className="reset-btn"
-                    onClick={() => {
-                      setRainyHours(DEFAULT_RAINY_HOURS);
-                      setPreferredTemp(DEFAULT_PREFERRED_TEMP);
-                      setPreferredHumidity(DEFAULT_PREFERRED_HUMIDITY);
-                      setPreferredWind(DEFAULT_PREFERRED_WIND);
-                      setEnableRainyHours(true);
-                      setEnableTemp(true);
-                      setEnableHumidity(true);
-                      setEnableWind(true);
-                      setMood(null);
-                      setSearchQuery("");
-                    }}>
-                    Reset filters
-                  </button>
-                  <button
-                    className="reset-btn"
-                    onClick={() => {
-                      setEnableRainyHours(false);
-                      setEnableTemp(false);
-                      setEnableHumidity(false);
-                      setEnableWind(false);
-                      setMood(null);
-                    }}>
-                    Disable all filters
-                  </button>
-                </div>
+
               </div>
             </div>
 
             {/* ─── Destination cards ─── */}
             <div className="cards-panel">
+              <div className="filter-actions">
+                <button
+                  className="action-btn"
+                  onClick={() => {
+                    setEnableRainyHours(false);
+                    setEnableTemp(false);
+                    setEnableHumidity(false);
+                    setEnableWind(false);
+                    setMood(null);
+                  }}>
+                  Disable all filters
+                </button>
+                <button
+                  className="action-btn"
+                  onClick={() => {
+                    setRainyHours(DEFAULT_RAINY_HOURS);
+                    setPreferredTemp(DEFAULT_PREFERRED_TEMP);
+                    setPreferredHumidity(DEFAULT_PREFERRED_HUMIDITY);
+                    setPreferredWind(DEFAULT_PREFERRED_WIND);
+                    setEnableRainyHours(false);
+                    setEnableTemp(false);
+                    setEnableHumidity(false);
+                    setEnableWind(false);
+                    setMood(null);
+                    setSearchQuery("");
+                  }}>
+                  Reset all
+                </button>
+              </div>
               <div className="search-row">
                 <span className="search-icon">🔍</span>
                 <input
