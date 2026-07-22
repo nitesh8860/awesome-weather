@@ -53,15 +53,27 @@ const PRESETS = [
     wind: 8,
   },
   {
-    label: "Storm Chase",
+    label: "Monsoon",
     icon: "⛈",
-    desc: "Hot, humid, gusty, electric",
-    rainyHours: 18,
+    desc: "Heavy rain, warm, humid, breezy",
+    rainyHours: 14,
     temp: 28,
     humidity: 80,
-    wind: 35,
+    wind: 15,
   },
 ];
+
+function parseCountry(placeName) {
+  const parts = placeName.split(", ");
+  return parts.length > 1 ? parts[parts.length - 1] : "";
+}
+
+function parseCity(placeName) {
+  const parts = placeName.split(", ");
+  return parts.length > 1
+    ? parts.slice(0, -1).join(", ")
+    : placeName;
+}
 
 function inRange(value, center) {
   return (
@@ -79,6 +91,7 @@ function filterPlace(place, filters) {
     preferredHumidity,
     enableWind,
     preferredWind,
+    country,
   } = filters;
 
   const dayTemp =
@@ -147,7 +160,6 @@ function App() {
     if (v === null) return fallback;
     return v !== "false";
   }
-
   const [rainyHours, setRainyHours] = useState(
     initialVal("rainyHours", DEFAULT_RAINY_HOURS),
   );
@@ -283,9 +295,10 @@ function App() {
     syncUrl,
   ]);
 
-  const matchedCount = places.filter((place) =>
+  const matchedPlaces = places.filter((place) =>
     filterPlace(place, currentFilters),
-  ).length;
+  );
+  const matchedCount = matchedPlaces.length;
 
   function rangeLabel(center) {
     const lo = Math.max(0, center - RANGE_DELTA);
@@ -462,6 +475,7 @@ function App() {
                   <span>50</span>
                 </div>
               </div>
+
               <div className="slider-note secondary">
                 <span className="match-count">
                   {matchedCount} of {allPlacesCount} cities match
@@ -477,6 +491,7 @@ function App() {
                   <tr>
                     <th>#</th>
                     <th>City</th>
+                    <th>Country</th>
                     <th>Location</th>
                     <th>Forecast Date</th>
                     <th>Rain</th>
@@ -487,41 +502,40 @@ function App() {
                 </thead>
                 <tbody>
                   {matchedCount ? (
-                    places
-                      .filter((place) => filterPlace(place, currentFilters))
-                      .map((place, index) => (
-                        <tr key={place.name}>
-                          <td>{index + 1}</td>
-                          <td>{place.name}</td>
-                          <td>
-                            <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                                place.location,
-                              )}`}
-                              target="_blank"
-                              rel="noreferrer noopener">
-                              {place.location}
-                            </a>
-                          </td>
-                          <td>{place.forecastDate}</td>
-                          <td>{place.rainyHours}h</td>
-                          <td>
-                            {place.minTemperature != null
-                              ? `${place.minTemperature}–${place.maxTemperature}`
-                              : "-"}
-                          </td>
-                          <td>
-                            {place.minHumidity != null
-                              ? `${place.minHumidity}–${place.maxHumidity}`
-                              : "-"}
-                          </td>
-                          <td>
-                            {place.minWind != null
-                              ? `${place.minWind}–${place.maxWind}`
-                              : "-"}
-                          </td>
-                        </tr>
-                      ))
+                    matchedPlaces.map((place, index) => (
+                      <tr key={place.name}>
+                        <td>{index + 1}</td>
+                        <td>{parseCity(place.name)}</td>
+                        <td>{parseCountry(place.name)}</td>
+                        <td>
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              place.location,
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer noopener">
+                            {place.location}
+                          </a>
+                        </td>
+                        <td>{place.forecastDate}</td>
+                        <td>{place.rainyHours}h</td>
+                        <td>
+                          {place.minTemperature != null
+                            ? `${place.minTemperature}–${place.maxTemperature}`
+                            : "-"}
+                        </td>
+                        <td>
+                          {place.minHumidity != null
+                            ? `${place.minHumidity}–${place.maxHumidity}`
+                            : "-"}
+                        </td>
+                        <td>
+                          {place.minWind != null
+                            ? `${place.minWind}–${place.maxWind}`
+                            : "-"}
+                        </td>
+                      </tr>
+                    ))
                   ) : (
                     <tr>
                       <td colSpan="8">
