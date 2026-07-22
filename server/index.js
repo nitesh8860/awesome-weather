@@ -17,6 +17,22 @@ const CITY_SOURCE_URL =
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const MAX_CITY_LOAD = 1200;
 const FORECAST_DAY_OFFSET = 14;
+const RANGE_DELTA = 5;
+
+function inRange(value, center) {
+  return (
+    value >= Math.max(0, center - RANGE_DELTA) &&
+    value <= center + RANGE_DELTA
+  );
+}
+
+function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(timeoutId),
+  );
+}
 
 const CACHE_FILE = path.join(__dirname, "server", "weather-cache.json");
 const CACHE_TTL_DAYS = 1; // refresh once every day
@@ -118,8 +134,6 @@ async function loadCities() {
   }
 }
 
-await loadCities();
-
 async function loadCacheFromDisk() {
   try {
     const raw = await fs.readFile(CACHE_FILE, "utf8");
@@ -155,15 +169,47 @@ function isCacheStale() {
 }
 
 async function refreshCacheInBatches() {
+  // Ensure cities are loaded before refresh
+  if (cities.length === 0) {
+    console.log("Cities not loaded yet. Loading before cache refresh...");
+    await loadCities();
+  }
+
   console.log("Refreshing weather cache for", cities.length, "cities...");
   const results = [];
   const batchSize = 12;
   for (let i = 0; i < cities.length; i += batchSize) {
     const batch = cities.slice(i, i + batchSize);
-    const settled = await Promise.allSettled(batch.map(getCityWeather));
-    settled.forEach((s) => {
-      if (s.status === "fulfilled" && s.value) results.push(s.value);
+
+    // First pass
+    const settled = await Promise.allSettled(
+      batch.map((city) => getCityWeather(city)),
+    );
+
+    // Collect failures for retry
+    const retryItems = [];
+    settled.forEach((s, idx) => {
+      if (s.status === "fulfilled" && s.value) {
+        results.push(s.value);
+      } else if (s.status === "rejected") {
+        retryItems.push(batch[idx]);
+      }
     });
+
+    // Retry failed items once after a short delay
+    if (retryItems.length > 0) {
+      console.log(
+        `  Retrying ${retryItems.length} failed item(s) in batch ${Math.floor(i / batchSize) + 1}...`,
+      );
+      await new Promise((r) => setTimeout(r, 1000));
+      const retried = await Promise.allSettled(
+        retryItems.map((city) => getCityWeather(city)),
+      );
+      retried.forEach((s) => {
+        if (s.status === "fulfilled" && s.value) results.push(s.value);
+      });
+    }
+
     // polite delay to avoid hammering APIs
     await new Promise((r) => setTimeout(r, 400));
   }
@@ -205,21 +251,29 @@ function scheduleDailyRefresh() {
   }, delay);
 }
 
-// Try load cache; if missing or stale, refresh and block startup until first refresh completes
-await loadCacheFromDisk();
-if (isCacheStale()) {
-  console.log(
-    "Initial cache missing or stale. Performing blocking refresh before server start...",
-  );
-  try {
-    await refreshCacheInBatches();
-  } catch (e) {
-    console.error("Initial cache refresh failed:", e);
-    // continue startup with whatever (possibly empty) cache is available
-  }
-} else {
-  console.log("Loaded fresh weather cache from disk; starting server.");
-}
+// Start server immediately (non-blocking)
+app.listen(PORT, () => {
+  console.log(`Backend running on http://localhost:${PORT}`);
+});
+
+// Load cities in background, then check/refresh cache
+loadCities()
+  .then(async () => {
+    await loadCacheFromDisk();
+    if (isCacheStale()) {
+      console.log(
+        "Cache stale or missing. Refreshing in background...",
+      );
+      return refreshCacheInBatches()
+        .then(() => console.log("Background cache refresh complete."))
+        .catch((e) =>
+          console.error("Background cache refresh failed:", e),
+        );
+    } else {
+      console.log("Loaded fresh weather cache from disk.");
+    }
+  })
+  .catch((e) => console.error("Initialization error:", e));
 
 scheduleDailyRefresh();
 
@@ -231,14 +285,14 @@ async function getCityWeather(city) {
   const params = new URLSearchParams({
     latitude: city.latitude,
     longitude: city.longitude,
-    hourly: "temperature_2m,precipitation,relativehumidity_2m",
+    hourly: "temperature_2m,precipitation,relativehumidity_2m,wind_speed_10m",
     start_date: formatDate(targetDate),
     end_date: formatDate(targetDate),
     timezone: "UTC",
   });
 
   const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
 
   if (!response.ok) {
     throw new Error(`Weather API error for ${city.name}`);
@@ -255,12 +309,15 @@ async function getCityWeather(city) {
   const humidities = Array.isArray(data?.hourly?.relativehumidity_2m)
     ? data.hourly.relativehumidity_2m
     : [];
+  const winds = Array.isArray(data?.hourly?.wind_speed_10m)
+    ? data.hourly.wind_speed_10m
+    : [];
 
-  const hourlyForecast = times.map((time, index) => ({
-    time,
+  const hourlyForecast = times.map((_time, index) => ({
     temperature: temperatures[index] ?? null,
     precipitation: precipitations[index] ?? 0,
     humidity: humidities[index] ?? null,
+    wind: winds[index] ?? null,
   }));
 
   const rainyHours = hourlyForecast.filter(
@@ -276,6 +333,9 @@ async function getCityWeather(city) {
   const validHumidities = hourlyForecast
     .map((entry) => entry.humidity)
     .filter((value) => typeof value === "number");
+  const validWinds = hourlyForecast
+    .map((entry) => entry.wind)
+    .filter((value) => typeof value === "number");
 
   const minTemperature = validTemperatures.length
     ? Math.min(...validTemperatures)
@@ -289,6 +349,8 @@ async function getCityWeather(city) {
   const maxHumidity = validHumidities.length
     ? Math.max(...validHumidities)
     : null;
+  const minWind = validWinds.length ? Math.min(...validWinds) : null;
+  const maxWind = validWinds.length ? Math.max(...validWinds) : null;
 
   return {
     name: city.name,
@@ -302,9 +364,8 @@ async function getCityWeather(city) {
       maxTemperature !== null ? Number(maxTemperature.toFixed(1)) : null,
     minHumidity: minHumidity !== null ? Number(minHumidity.toFixed(0)) : null,
     maxHumidity: maxHumidity !== null ? Number(maxHumidity.toFixed(0)) : null,
-    firstRainHour:
-      hourlyForecast.find((entry) => entry.precipitation > 0)?.time || null,
-    hourly: hourlyForecast,
+    minWind: minWind !== null ? Number(minWind.toFixed(0)) : null,
+    maxWind: maxWind !== null ? Number(maxWind.toFixed(0)) : null,
   };
 }
 
@@ -317,10 +378,75 @@ app.get("/api/weather", async (req, res) => {
       });
     }
 
+    // Parse optional query params for server-side filtering
+    const {
+      rainyHours: rainyHoursParam,
+      temperature: temperatureParam,
+      humidity: humidityParam,
+      wind: windParam,
+    } = req.query;
+
+    const hasFilters =
+      rainyHoursParam !== undefined ||
+      temperatureParam !== undefined ||
+      humidityParam !== undefined ||
+      windParam !== undefined;
+
+    let filtered = cache.data;
+
+    if (hasFilters) {
+      const centerRainyHours = rainyHoursParam
+        ? Number(rainyHoursParam)
+        : null;
+      const centerTemp = temperatureParam ? Number(temperatureParam) : null;
+      const centerHumidity = humidityParam ? Number(humidityParam) : null;
+      const centerWind = windParam ? Number(windParam) : null;
+
+      filtered = cache.data.filter((place) => {
+        const dayTemp =
+          place.minTemperature != null && place.maxTemperature != null
+            ? (place.minTemperature + place.maxTemperature) / 2
+            : (place.minTemperature ?? place.maxTemperature ?? 0);
+        const dayHumidity =
+          place.minHumidity != null && place.maxHumidity != null
+            ? (place.minHumidity + place.maxHumidity) / 2
+            : (place.minHumidity ?? place.maxHumidity ?? 0);
+        const dayWind =
+          place.minWind != null && place.maxWind != null
+            ? (place.minWind + place.maxWind) / 2
+            : (place.minWind ?? place.maxWind ?? 0);
+
+        if (
+          centerRainyHours !== null &&
+          !inRange(place.rainyHours, centerRainyHours)
+        ) {
+          return false;
+        }
+        if (centerTemp !== null && !inRange(dayTemp, centerTemp)) {
+          return false;
+        }
+        if (centerHumidity !== null && !inRange(dayHumidity, centerHumidity)) {
+          return false;
+        }
+        if (centerWind !== null && !inRange(dayWind, centerWind)) {
+          return false;
+        }
+        return true;
+      });
+    }
+
     res.json({
       generatedAt: new Date().toISOString(),
-      count: cache.data.length,
-      data: cache.data,
+      count: filtered.length,
+      filters: hasFilters
+        ? {
+            rainyHours: rainyHoursParam ?? null,
+            temperature: temperatureParam ?? null,
+            humidity: humidityParam ?? null,
+            wind: windParam ?? null,
+          }
+        : null,
+      data: filtered,
     });
   } catch (error) {
     console.error("API error:", error);
@@ -358,10 +484,6 @@ app.get("/api/top-rainy", async (req, res) => {
 app.get("/", (req, res) => {
   res.json({
     message: "Where To Go API is running",
-    endpoints: ["/api/top-rainy"],
+    endpoints: ["/api/weather", "/api/top-rainy"],
   });
-});
-
-app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
 });
