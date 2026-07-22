@@ -327,8 +327,18 @@ header h1 .hl {
 
 .filter-actions {
   display: flex;
+  align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.6rem;
+  padding-right: 0.25rem;
+}
+
+.city-count {
+  margin-left: auto;
+  padding-right: 0.2rem;
+  font-size: 0.78rem;
+  color: #999;
+  white-space: nowrap;
 }
 
 .search-row {

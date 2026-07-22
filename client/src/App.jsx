@@ -434,6 +434,9 @@ function App() {
                   }}>
                   Reset all
                 </button>
+                <span className="city-count">
+                  {allPlacesCount.toLocaleString()} cities
+                </span>
               </div>
               <div className="search-row">
                 <span className="search-icon">🔍</span>
