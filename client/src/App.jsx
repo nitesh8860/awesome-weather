@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 const DEFAULT_RAINY_HOURS = 1;
 const DEFAULT_PREFERRED_TEMP = 17;
@@ -130,6 +132,65 @@ function weatherEmoji(place) {
   return "⛅";
 }
 
+function MapView({ places }) {
+  const mapRef = useRef(null);
+  const mapInstance = useRef(null);
+
+  useEffect(() => {
+    if (mapInstance.current) {
+      mapInstance.current.remove();
+      mapInstance.current = null;
+    }
+
+    const map = L.map(mapRef.current, {
+      zoomControl: true,
+      scrollWheelZoom: true,
+    }).setView([20, 0], 2);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18,
+    }).addTo(map);
+
+    const bounds = [];
+    places.forEach((place) => {
+      const [lat, lng] = place.location.split(", ").map(Number);
+      if (isNaN(lat) || isNaN(lng)) return;
+      bounds.push([lat, lng]);
+
+      const popupContent = `
+        <div style="font-family:system-ui,sans-serif;font-size:0.85rem;line-height:1.5;min-width:180px">
+          <strong style="font-size:1rem">${parseCity(place.name)}</strong>
+          <div style="color:#666;font-size:0.8rem">${parseCountry(place.name)}</div>
+          <div style="margin-top:0.3rem">🌧 ${place.rainyHours}h &middot; 🌡 ${place.minTemperature ?? "-"}–${place.maxTemperature ?? "-"}°</div>
+          <div>💨 ${place.minWind ?? "-"}–${place.maxWind ?? "-"} km/h</div>
+          <a href="https://www.google.com/travel/flights?q=flights+to+${encodeURIComponent(parseCity(place.name))}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:0.3rem;padding:0.2rem 0.7rem;border-radius:1rem;background:#e8e8e8;color:#333;text-decoration:none;font-size:0.8rem;font-weight:600">Plan trip &rarr;</a>
+        </div>
+      `;
+
+      L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup(popupContent);
+    });
+
+    if (bounds.length > 1) {
+      map.fitBounds(bounds, { padding: [30, 30] });
+    } else if (bounds.length === 1) {
+      map.setView(bounds[0], 10);
+    }
+
+    mapInstance.current = map;
+
+    return () => {
+      map.remove();
+      mapInstance.current = null;
+    };
+  }, [places]);
+
+  return <div ref={mapRef} className="map-container" />;
+}
+
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const hasUrlParams = [...urlParams.keys()].length > 0;
@@ -153,6 +214,7 @@ function App() {
   const [enableWind, setEnableWind] = useState(initialBool("enableWind", true));
   const [mood, setMood] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState("cards");
 
   const [places, setPlaces] = useState([]);
   const [allPlacesCount, setAllPlacesCount] = useState(0);
@@ -392,8 +454,25 @@ function App() {
                     ✕
                   </button>
                 )}
+                <div className="view-toggle">
+                  <button
+                    className={`view-btn${viewMode === "cards" ? " active" : ""}`}
+                    onClick={() => setViewMode("cards")}>
+                    🗂 Cards
+                  </button>
+                  <button
+                    className={`view-btn${viewMode === "map" ? " active" : ""}`}
+                    onClick={() => setViewMode("map")}>
+                    🗺 Map
+                  </button>
+                </div>
               </div>
-              {matchedPlaces.length ? (
+
+              {viewMode === "map" && matchedPlaces.length > 0 && (
+                <MapView places={matchedPlaces} />
+              )}
+
+              {viewMode === "cards" && (matchedPlaces.length ? (
                 <div className="cards-grid">
                   {matchedPlaces.map((place, index) => (
                     <div className="dest-card" key={place.name}>
@@ -424,7 +503,7 @@ function App() {
                   <div className="empty-icon">🔍</div>
                   <div>No cities match your filters. Try a different mood or widen the ranges.</div>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         </>
