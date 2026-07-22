@@ -16,7 +16,7 @@ const CITY_SOURCE_URL =
   "https://countriesnow.space/api/v0.1/countries/population/cities";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const MAX_CITY_LOAD = 1200;
-const FORECAST_DAY_OFFSET = 14;
+const SUPPORTED_OFFSETS = [6, 13]; // 1 week and 2 weeks ahead (Open-Meteo limit: 16 days)
 const RANGE_DELTA = 5;
 
 function inRange(value, center) {
@@ -26,7 +26,7 @@ function inRange(value, center) {
   );
 }
 
-function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(url, { ...options, signal: controller.signal }).finally(() =>
@@ -36,7 +36,8 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
 
 const CACHE_FILE = path.join(__dirname, "server", "weather-cache.json");
 const CACHE_TTL_DAYS = 1; // refresh once every day
-let cache = { timestamp: 0, data: [] };
+// Cache keyed by offset: { 13: { data: [...], timestamp: 123 }, ... }
+let cache = {};
 
 function formatDate(date) {
   return date.toISOString().slice(0, 10);
@@ -138,12 +139,23 @@ async function loadCacheFromDisk() {
   try {
     const raw = await fs.readFile(CACHE_FILE, "utf8");
     const parsed = JSON.parse(raw);
+    // Support old format (flat { timestamp, data }) and new format (keyed by offset)
+    if (parsed && parsed.offsets) {
+      cache = parsed.offsets;
+      const counts = Object.entries(cache).map(
+        ([o, v]) => `${o}d: ${v.data.length} items`,
+      );
+      console.log("Loaded weather cache from disk (", counts.join(", "), ")");
+      return true;
+    }
     if (parsed && parsed.timestamp && Array.isArray(parsed.data)) {
-      cache = parsed;
+      // Migrate old format
+      cache = { "13": { data: parsed.data, timestamp: parsed.timestamp } };
+      await saveCacheToDisk();
       console.log(
-        "Loaded weather cache from disk (",
-        cache.data.length,
-        "items )",
+        "Migrated old cache format (",
+        parsed.data.length,
+        "items at offset 13)",
       );
       return true;
     }
@@ -153,37 +165,44 @@ async function loadCacheFromDisk() {
   return false;
 }
 
-async function saveCacheToDisk(obj) {
+async function saveCacheToDisk() {
   try {
     await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(obj, null, 2), "utf8");
+    await fs.writeFile(
+      CACHE_FILE,
+      JSON.stringify({ offsets: cache }, null, 2),
+      "utf8",
+    );
   } catch (e) {
     console.error("Failed to write cache to disk:", e);
   }
 }
 
-function isCacheStale() {
-  if (!cache || !cache.timestamp) return true;
-  const ageMs = Date.now() - cache.timestamp;
-  return ageMs > CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
+function isOffsetStale(offset) {
+  const entry = cache[offset];
+  // Treat as stale if missing, no timestamp, or empty data (from a previous failed run)
+  if (!entry || !entry.timestamp || !Array.isArray(entry.data) || entry.data.length === 0) return true;
+  return Date.now() - entry.timestamp > CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
 }
 
-async function refreshCacheInBatches() {
+async function refreshOffset(offset) {
   // Ensure cities are loaded before refresh
   if (cities.length === 0) {
     console.log("Cities not loaded yet. Loading before cache refresh...");
     await loadCities();
   }
 
-  console.log("Refreshing weather cache for", cities.length, "cities...");
+  console.log(
+    `Refreshing weather cache for offset ${offset}d (${cities.length} cities)...`,
+  );
   const results = [];
-  const batchSize = 12;
+  const batchSize = 8;
   for (let i = 0; i < cities.length; i += batchSize) {
     const batch = cities.slice(i, i + batchSize);
 
     // First pass
     const settled = await Promise.allSettled(
-      batch.map((city) => getCityWeather(city)),
+      batch.map((city) => getCityWeather(city, offset)),
     );
 
     // Collect failures for retry
@@ -193,17 +212,27 @@ async function refreshCacheInBatches() {
         results.push(s.value);
       } else if (s.status === "rejected") {
         retryItems.push(batch[idx]);
+        if (s.reason) {
+          console.log(`  [FAIL] ${batch[idx].name}: ${s.reason.message?.slice(0, 150) || s.reason}`);
+        }
       }
     });
 
-    // Retry failed items once after a short delay
+    // Retry failed items once
     if (retryItems.length > 0) {
-      console.log(
-        `  Retrying ${retryItems.length} failed item(s) in batch ${Math.floor(i / batchSize) + 1}...`,
+      // Check if any failed with 429 (rate limit) — if so, wait longer
+      const hasRateLimit = settled.some(
+        (s) => s.status === "rejected" && s.reason?.status === 429,
       );
-      await new Promise((r) => setTimeout(r, 1000));
+      const retryDelay = hasRateLimit ? 30000 : 2000;
+      if (hasRateLimit) {
+        console.log(
+          `  Rate limited (429). Waiting ${retryDelay / 1000}s before retry...`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, retryDelay));
       const retried = await Promise.allSettled(
-        retryItems.map((city) => getCityWeather(city)),
+        retryItems.map((city) => getCityWeather(city, offset)),
       );
       retried.forEach((s) => {
         if (s.status === "fulfilled" && s.value) results.push(s.value);
@@ -211,12 +240,26 @@ async function refreshCacheInBatches() {
     }
 
     // polite delay to avoid hammering APIs
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 1200));
   }
 
-  cache = { timestamp: Date.now(), data: results };
-  await saveCacheToDisk(cache);
-  console.log("Weather cache refreshed; stored", results.length, "items");
+  cache[offset] = { timestamp: Date.now(), data: results };
+  await saveCacheToDisk();
+  console.log(
+    `Offset ${offset}d refreshed; stored ${results.length} items`,
+  );
+}
+
+async function refreshAllOffsets() {
+  for (const offset of SUPPORTED_OFFSETS) {
+    try {
+      await refreshOffset(offset);
+    } catch (e) {
+      console.error(`Failed to refresh offset ${offset}d:`, e);
+    }
+    // Stagger offsets to avoid hammering the API
+    await new Promise((r) => setTimeout(r, 10000));
+  }
 }
 
 function msUntilNextMidnight() {
@@ -233,7 +276,7 @@ function scheduleDailyRefresh() {
   );
   setTimeout(async () => {
     try {
-      await refreshCacheInBatches();
+      await refreshAllOffsets();
     } catch (e) {
       console.error("Daily refresh failed:", e);
     }
@@ -241,7 +284,7 @@ function scheduleDailyRefresh() {
     setInterval(
       async () => {
         try {
-          await refreshCacheInBatches();
+          await refreshAllOffsets();
         } catch (e) {
           console.error("Daily refresh failed:", e);
         }
@@ -256,15 +299,16 @@ app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
 });
 
-// Load cities in background, then check/refresh cache
+// Load cities in background, then check/refresh all offsets
 loadCities()
   .then(async () => {
     await loadCacheFromDisk();
-    if (isCacheStale()) {
+    const staleOffsets = SUPPORTED_OFFSETS.filter((o) => isOffsetStale(o));
+    if (staleOffsets.length > 0) {
       console.log(
-        "Cache stale or missing. Refreshing in background...",
+        `Offsets ${staleOffsets.join(", ")}d stale. Refreshing in background...`,
       );
-      return refreshCacheInBatches()
+      return refreshAllOffsets()
         .then(() => console.log("Background cache refresh complete."))
         .catch((e) =>
           console.error("Background cache refresh failed:", e),
@@ -277,10 +321,10 @@ loadCities()
 
 scheduleDailyRefresh();
 
-async function getCityWeather(city) {
+async function getCityWeather(city, offset) {
   const today = new Date();
   const targetDate = new Date(today);
-  targetDate.setDate(today.getDate() + FORECAST_DAY_OFFSET);
+  targetDate.setDate(today.getDate() + Number(offset));
 
   const params = new URLSearchParams({
     latitude: city.latitude,
@@ -295,7 +339,13 @@ async function getCityWeather(city) {
   const response = await fetchWithTimeout(url);
 
   if (!response.ok) {
-    throw new Error(`Weather API error for ${city.name}`);
+    const body = await response.text().catch(() => "");
+    const err = new Error(
+      `Weather API error for ${city.name}: ${response.status} ${body.slice(0, 120)}`,
+    );
+    err.status = response.status;
+    err.city = city.name;
+    throw err;
   }
 
   const data = await response.json();
@@ -371,20 +421,27 @@ async function getCityWeather(city) {
 
 app.get("/api/weather", async (req, res) => {
   try {
-    if (!cache || !Array.isArray(cache.data) || cache.data.length === 0) {
-      return res.status(503).json({
-        message:
-          "Weather cache is warming. Please try again in a few minutes while data is fetched.",
-      });
-    }
-
-    // Parse optional query params for server-side filtering
+    // Parse optional query params
     const {
       rainyHours: rainyHoursParam,
       temperature: temperatureParam,
       humidity: humidityParam,
       wind: windParam,
+      offset: offsetParam,
     } = req.query;
+
+    const targetOffset = offsetParam ? Number(offsetParam) : 13;
+    const offsetData = cache[targetOffset];
+
+    if (!offsetData || !Array.isArray(offsetData.data) || offsetData.data.length === 0) {
+      console.log(
+        `[API 503] offset=${targetOffset} cacheKeys=[${Object.keys(cache)}]`,
+      );
+      return res.status(503).json({
+        message: `Weather data for ${targetOffset} days ahead is still loading. Please try again in a few minutes.`,
+        offset: targetOffset,
+      });
+    }
 
     const hasFilters =
       rainyHoursParam !== undefined ||
@@ -392,7 +449,7 @@ app.get("/api/weather", async (req, res) => {
       humidityParam !== undefined ||
       windParam !== undefined;
 
-    let filtered = cache.data;
+    let filtered = offsetData.data;
 
     if (hasFilters) {
       const centerRainyHours = rainyHoursParam
@@ -402,7 +459,7 @@ app.get("/api/weather", async (req, res) => {
       const centerHumidity = humidityParam ? Number(humidityParam) : null;
       const centerWind = windParam ? Number(windParam) : null;
 
-      filtered = cache.data.filter((place) => {
+      filtered = offsetData.data.filter((place) => {
         const dayTemp =
           place.minTemperature != null && place.maxTemperature != null
             ? (place.minTemperature + place.maxTemperature) / 2
@@ -437,6 +494,7 @@ app.get("/api/weather", async (req, res) => {
 
     res.json({
       generatedAt: new Date().toISOString(),
+      offset: targetOffset,
       count: filtered.length,
       filters: hasFilters
         ? {
@@ -456,16 +514,16 @@ app.get("/api/weather", async (req, res) => {
 
 app.get("/api/top-rainy", async (req, res) => {
   try {
-    if (!cache || !Array.isArray(cache.data) || cache.data.length === 0) {
+    const offset = Number(req.query.offset) || 13;
+    const offsetData = cache[offset];
+
+    if (!offsetData || !Array.isArray(offsetData.data) || offsetData.data.length === 0) {
       return res.status(503).json({
-        message:
-          "Weather cache is warming. Please try again in a few minutes while data is fetched.",
+        message: `Weather data for ${offset} days ahead is still loading.`,
       });
     }
 
-    const all = cache.data;
-
-    const valid = all
+    const valid = offsetData.data
       .filter((city) => city && city.rainyHours > 0)
       .sort((a, b) => b.rainyHours - a.rainyHours)
       .slice(0, 10);
