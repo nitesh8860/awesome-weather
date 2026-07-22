@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import fs from "fs/promises";
+import { readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -36,8 +37,34 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
 
 const CACHE_FILE = path.join(__dirname, "server", "weather-cache.json");
 const CACHE_TTL_DAYS = 1; // refresh once every day
-// Cache keyed by offset: { 13: { data: [...], timestamp: 123 }, ... }
-let cache = {};
+// Active cache served to users (never mutated during refresh — stale-while-revalidate)
+let activeCache = {};
+
+// Load cache synchronously before server starts (takes <10ms)
+try {
+  const raw = readFileSync(CACHE_FILE, "utf8");
+  const parsed = JSON.parse(raw);
+  if (parsed && parsed.offsets) {
+    activeCache = parsed.offsets;
+    const counts = Object.entries(activeCache).map(
+      ([o, v]) => `${o}d: ${v.data.length} items`,
+    );
+    console.log("Loaded weather cache from disk (", counts.join(", "), ")");
+  } else if (parsed && parsed.timestamp && Array.isArray(parsed.data)) {
+    // Migrate old format
+    activeCache = {
+      "13": { data: parsed.data, timestamp: parsed.timestamp },
+    };
+    console.log(
+      "Migrated old cache format (",
+      parsed.data.length,
+      "items at offset 13)",
+    );
+  }
+} catch (e) {
+  // No cache file yet — first run
+  console.log("No cache file found. Data will be fetched in background.");
+}
 
 function formatDate(date) {
   return date.toISOString().slice(0, 10);
@@ -135,42 +162,12 @@ async function loadCities() {
   }
 }
 
-async function loadCacheFromDisk() {
-  try {
-    const raw = await fs.readFile(CACHE_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    // Support old format (flat { timestamp, data }) and new format (keyed by offset)
-    if (parsed && parsed.offsets) {
-      cache = parsed.offsets;
-      const counts = Object.entries(cache).map(
-        ([o, v]) => `${o}d: ${v.data.length} items`,
-      );
-      console.log("Loaded weather cache from disk (", counts.join(", "), ")");
-      return true;
-    }
-    if (parsed && parsed.timestamp && Array.isArray(parsed.data)) {
-      // Migrate old format
-      cache = { "13": { data: parsed.data, timestamp: parsed.timestamp } };
-      await saveCacheToDisk();
-      console.log(
-        "Migrated old cache format (",
-        parsed.data.length,
-        "items at offset 13)",
-      );
-      return true;
-    }
-  } catch (e) {
-    // ignore missing file
-  }
-  return false;
-}
-
 async function saveCacheToDisk() {
   try {
     await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
     await fs.writeFile(
       CACHE_FILE,
-      JSON.stringify({ offsets: cache }, null, 2),
+      JSON.stringify({ offsets: activeCache }, null, 2),
       "utf8",
     );
   } catch (e) {
@@ -179,7 +176,7 @@ async function saveCacheToDisk() {
 }
 
 function isOffsetStale(offset) {
-  const entry = cache[offset];
+  const entry = activeCache[offset];
   // Treat as stale if missing, no timestamp, or empty data (from a previous failed run)
   if (!entry || !entry.timestamp || !Array.isArray(entry.data) || entry.data.length === 0) return true;
   return Date.now() - entry.timestamp > CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
@@ -243,7 +240,9 @@ async function refreshOffset(offset) {
     await new Promise((r) => setTimeout(r, 1200));
   }
 
-  cache[offset] = { timestamp: Date.now(), data: results };
+  // Atomically swap the staging data into active cache
+  // Users never see a partially-built cache
+  activeCache[offset] = { timestamp: Date.now(), data: results };
   await saveCacheToDisk();
   console.log(
     `Offset ${offset}d refreshed; stored ${results.length} items`,
@@ -302,7 +301,6 @@ app.listen(PORT, () => {
 // Load cities in background, then check/refresh all offsets
 loadCities()
   .then(async () => {
-    await loadCacheFromDisk();
     const staleOffsets = SUPPORTED_OFFSETS.filter((o) => isOffsetStale(o));
     if (staleOffsets.length > 0) {
       console.log(
@@ -431,11 +429,11 @@ app.get("/api/weather", async (req, res) => {
     } = req.query;
 
     const targetOffset = offsetParam ? Number(offsetParam) : 13;
-    const offsetData = cache[targetOffset];
+    const offsetData = activeCache[targetOffset];
 
     if (!offsetData || !Array.isArray(offsetData.data) || offsetData.data.length === 0) {
       console.log(
-        `[API 503] offset=${targetOffset} cacheKeys=[${Object.keys(cache)}]`,
+        `[API 503] offset=${targetOffset} cacheKeys=[${Object.keys(activeCache)}]`,
       );
       return res.status(503).json({
         message: `Weather data for ${targetOffset} days ahead is still loading. Please try again in a few minutes.`,
@@ -515,7 +513,7 @@ app.get("/api/weather", async (req, res) => {
 app.get("/api/top-rainy", async (req, res) => {
   try {
     const offset = Number(req.query.offset) || 13;
-    const offsetData = cache[offset];
+    const offsetData = activeCache[offset];
 
     if (!offsetData || !Array.isArray(offsetData.data) || offsetData.data.length === 0) {
       return res.status(503).json({
