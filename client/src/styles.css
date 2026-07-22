@@ -266,7 +266,83 @@ header h1 .hl {
   transition: color 350ms ease;
 }
 
+.reset-btn {
+  display: block;
+  margin: 0.4rem auto 0;
+  padding: 0.3rem 1rem;
+  border: 1px solid var(--accent-alpha);
+  border-radius: 2rem;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.reset-btn:hover {
+  background: var(--accent-alpha);
+  border-color: var(--accent-border);
+}
+
 /* ─── Cards ─── */
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(120, 120, 120, 0.2);
+  border-radius: 0.7rem;
+  transition: border-color 200ms ease;
+}
+
+.search-row:focus-within {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-alpha);
+}
+
+.search-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #1a1a1a;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: #aaa;
+}
+
+.search-clear {
+  border: none;
+  background: rgba(120, 120, 120, 0.15);
+  border-radius: 50%;
+  width: 1.3rem;
+  height: 1.3rem;
+  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #666;
+  flex-shrink: 0;
+  transition: background 150ms ease;
+}
+
+.search-clear:hover {
+  background: rgba(120, 120, 120, 0.3);
+}
 
 .cards-panel {
   min-width: 0;

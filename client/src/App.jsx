@@ -152,6 +152,7 @@ function App() {
   const [enableHumidity, setEnableHumidity] = useState(initialBool("enableHumidity", true));
   const [enableWind, setEnableWind] = useState(initialBool("enableWind", true));
   const [mood, setMood] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [places, setPlaces] = useState([]);
   const [allPlacesCount, setAllPlacesCount] = useState(0);
@@ -222,8 +223,14 @@ function App() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [rainyHours, preferredTemp, preferredHumidity, preferredWind, enableRainyHours, enableTemp, enableHumidity, enableWind, selectedOffset, syncUrl]);
 
-  const matchedPlaces = places.filter((p) => filterPlace(p, currentFilters));
-  const matchedCount = matchedPlaces.length;
+  const filteredPlaces = places.filter((p) => filterPlace(p, currentFilters));
+  const matchedPlaces = searchQuery.trim()
+    ? filteredPlaces.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : filteredPlaces;
+  const matchedCount = filteredPlaces.length;
 
   const rangeLabel = (center) => `(${Math.max(0, center - RANGE_DELTA)}–${center + RANGE_DELTA})`;
 
@@ -336,13 +343,57 @@ function App() {
                     {matchedCount} of {allPlacesCount} cities match
                     {loading && places.length > 0 && " (updating…)"}
                   </span>
+                  <button
+                    className="reset-btn"
+                    onClick={() => {
+                      setRainyHours(DEFAULT_RAINY_HOURS);
+                      setPreferredTemp(DEFAULT_PREFERRED_TEMP);
+                      setPreferredHumidity(DEFAULT_PREFERRED_HUMIDITY);
+                      setPreferredWind(DEFAULT_PREFERRED_WIND);
+                      setEnableRainyHours(true);
+                      setEnableTemp(true);
+                      setEnableHumidity(true);
+                      setEnableWind(true);
+                      setMood(null);
+                      setSearchQuery("");
+                    }}>
+                    Reset filters
+                  </button>
+                  <button
+                    className="reset-btn"
+                    onClick={() => {
+                      setEnableRainyHours(false);
+                      setEnableTemp(false);
+                      setEnableHumidity(false);
+                      setEnableWind(false);
+                      setMood(null);
+                    }}>
+                    Disable all filters
+                  </button>
                 </div>
               </div>
             </div>
 
             {/* ─── Destination cards ─── */}
             <div className="cards-panel">
-              {matchedCount ? (
+              <div className="search-row">
+                <span className="search-icon">🔍</span>
+                <input
+                  className="search-input"
+                  type="text"
+                  placeholder="Search city or country…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    className="search-clear"
+                    onClick={() => setSearchQuery("")}>
+                    ✕
+                  </button>
+                )}
+              </div>
+              {matchedPlaces.length ? (
                 <div className="cards-grid">
                   {matchedPlaces.map((place, index) => (
                     <div className="dest-card" key={place.name}>
