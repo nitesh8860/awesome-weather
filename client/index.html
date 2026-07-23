@@ -3,15 +3,91 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Where to Go Next — Find your ideal travel weather</title>
-    <meta name="description" content="See which cities worldwide will have your ideal weather in the coming weeks. Pick a mood, choose a week, and plan your next trip with confidence." />
+
+    <!-- Primary Meta -->
+    <title>Where to Go Next — Find your ideal travel weather worldwide</title>
+    <meta name="description" content="See which cities worldwide will have your ideal weather 1–3 weeks ahead. Pick a mood, choose a week, and plan your next trip with confidence." />
+    <meta name="keywords" content="travel weather, vacation planning, weather forecast, trip planner, destination finder, climate, 14 day forecast" />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="awesomeweather.xyz" />
+    <link rel="canonical" href="https://awesomeweather.xyz/" />
+
+    <!-- Open Graph -->
     <meta property="og:title" content="Where to Go Next — Find your ideal travel weather" />
     <meta property="og:description" content="See which cities worldwide will have your ideal weather in the coming weeks. Pick a mood, choose a week, and plan your next trip." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://awesomeweather.xyz" />
+    <meta property="og:site_name" content="Where to Go Next" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Where to Go Next" />
     <meta name="twitter:description" content="Find cities with your ideal weather 1–3 weeks ahead. Plan your trip with confidence." />
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://api.open-meteo.com" />
+    <link rel="preconnect" href="https://{s}.tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="https://api.open-meteo.com" />
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Where to Go Next",
+      "url": "https://awesomeweather.xyz",
+      "description": "A weather-based travel planner that shows which cities worldwide will have your ideal weather 1–3 weeks ahead.",
+      "applicationCategory": "Travel Application",
+      "operatingSystem": "All",
+      "browserRequirements": "Requires JavaScript",
+      "offers": {
+        "@type": "Offer",
+        "price": "0"
+      }
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How does Where to Go Next work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Select a week (this week, next week, or 3 weeks ahead), choose a weather mood or adjust the sliders for rain, temperature, humidity, and wind. The app shows you which cities worldwide match your preferences."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the weather data reliable?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, all weather data comes from Open-Meteo, an open-source weather API that aggregates data from national weather services including NOAA, ECMWF, and DWD."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How far ahead can I check the weather?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You can check weather forecasts up to 3 weeks ahead. The app currently supports 1 week (6 days) and 2 weeks (13 days) ahead."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How many cities are included?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The app covers over 1,000 cities across more than 100 countries worldwide."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
