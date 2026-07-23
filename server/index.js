@@ -16,7 +16,7 @@ const cities = [];
 const CITY_SOURCE_URL =
   "https://countriesnow.space/api/v0.1/countries/population/cities";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
-const MAX_CITY_LOAD = 4000;
+const MAX_CITY_LOAD = 1200;
 const SUPPORTED_OFFSETS = [6, 13]; // 1 week and 2 weeks ahead (Open-Meteo limit: 16 days)
 const RANGE_DELTA = 5;
 
@@ -193,7 +193,7 @@ async function refreshOffset(offset) {
     `Refreshing weather cache for offset ${offset}d (${cities.length} cities)...`,
   );
   const results = [];
-  const batchSize = 3;
+  const batchSize = 2;
   for (let i = 0; i < cities.length; i += batchSize) {
     const batch = cities.slice(i, i + batchSize);
 
@@ -215,8 +215,10 @@ async function refreshOffset(offset) {
       }
     });
 
-    // Retry non-rate-limited failures once
-    const toRetry = retryItems.filter((r) => r.reason?.status !== 429).map((r) => r.city);
+    // Retry failures once (skip rate-limited or overloaded — they'll retry next cycle)
+    const toRetry = retryItems
+      .filter((r) => r.reason?.status !== 429 && r.reason?.status !== 503)
+      .map((r) => r.city);
 
     if (toRetry.length > 0) {
       await new Promise((r) => setTimeout(r, 2000));
@@ -229,7 +231,7 @@ async function refreshOffset(offset) {
     }
 
     // polite delay to avoid hammering APIs
-    await new Promise((r) => setTimeout(r, 2500));
+    await new Promise((r) => setTimeout(r, 3000));
   }
 
   // Atomically swap the staging data into active cache
@@ -242,15 +244,14 @@ async function refreshOffset(offset) {
 }
 
 async function refreshAllOffsets() {
-  for (const offset of SUPPORTED_OFFSETS) {
-    try {
-      await refreshOffset(offset);
-    } catch (e) {
-      console.error(`Failed to refresh offset ${offset}d:`, e);
-    }
-    // Stagger offsets to avoid hammering the API
-    await new Promise((r) => setTimeout(r, 15000));
-  }
+  // Run both offsets in parallel so all data is available at the same time
+  await Promise.all(
+    SUPPORTED_OFFSETS.map((offset) =>
+      refreshOffset(offset).catch((e) =>
+        console.error(`Failed to refresh offset ${offset}d:`, e),
+      ),
+    ),
+  );
 }
 
 function msUntilNextMidnight() {
